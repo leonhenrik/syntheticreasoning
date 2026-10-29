@@ -1,0 +1,10 @@
+model,prompt,score
+models/gemini-flash-lite-latest,supportive,88
+models/gemini-flash-lite-latest,strict,78
+models/gemini-3-flash-preview,supportive,92
+models/gemini-3-flash-preview,strict,71
+models/gemini-flash-lite-latest,neutral,85
+models/gemini-3-flash-preview,neutral,88
+models/gemini-3.1-flash-lite-preview,neutral,82
+models/gemini-3.1-flash-lite,strict,78
+models/gemini-3.5-flash,supportive,92
