@@ -8,3 +8,6 @@ models/gemini-3-flash-preview,neutral,88
 models/gemini-3.1-flash-lite-preview,neutral,82
 models/gemini-3.1-flash-lite,strict,78
 models/gemini-3.5-flash,supportive,92
+models/gemini-3.5-flash-lite,strict,78
+models/gemini-3.5-flash-lite,neutral,82
+models/gemini-3.5-flash-lite,supportive,88
