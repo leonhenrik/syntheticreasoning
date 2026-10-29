@@ -1,4 +1,19 @@
-# Gemini writing evaluation
+# Synthetic Reasoning
+
+A small web app for exploring how different AI evaluators score the same piece of writing. Paste text into the left panel, select **Evaluate writing**, and watch the score distributions build as results arrive.
+
+## Web app
+
+Set `GEMINI_API_KEY` or `gemini_api_key` in the environment or `.env.local`, install the Python dependencies, and start the local server:
+
+```powershell
+pip install -r requirements.txt
+pnpm dev
+```
+
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000). The app compares supportive, strict, and neutral evaluations across available Gemini models. The server listens on localhost and streams each completed score to the chart.
+
+## Command-line evaluation
 
 Replace `text_to_evaluate` in `prompts.json` with your writing. The three prompts ask each available Gemini model for one integer score from 1 to 100: supportive, strict, and neutral.
 

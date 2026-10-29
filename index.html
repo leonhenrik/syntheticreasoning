@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f5f0">
+  <title>Synthetic Reasoning — writing, seen differently</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f6f5f0;
+      --card: #fffefa;
+      --ink: #262c2a;
+      --muted: #858780;
+      --line: #e9e7df;
+      --olive: #65704f;
+      --olive-dark: #4e593b;
+      --olive-soft: #eef0e8;
+      --coral: #d27b61;
+      --blue: #727d9b;
+      --shadow: 0 18px 60px rgba(48, 48, 38, .055);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      background:
+        radial-gradient(ellipse at 78% 0%, rgba(226, 228, 213, .33), transparent 34rem),
+        var(--paper);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, textarea { font: inherit; }
+
+    .shell { max-width: 1200px; margin: 0 auto; padding: 0 48px; }
+
+    header {
+      height: 82px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(75, 79, 64, .1);
+    }
+
+    .brand { display: flex; align-items: center; gap: 11px; }
+    .brand-mark {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border-radius: 9px;
+      color: #fff;
+      background: var(--olive);
+    }
+    .brand-name { font-size: 14px; font-weight: 650; letter-spacing: -.025em; }
+    .header-note { color: var(--muted); font-size: 12px; letter-spacing: .01em; }
+
+    main { padding: 54px 0 64px; }
+    .intro { margin-bottom: 32px; }
+    .eyebrow {
+      color: var(--olive);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 12px 0 9px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(35px, 4vw, 48px);
+      font-weight: 400;
+      letter-spacing: -.045em;
+      line-height: 1.05;
+    }
+    .intro p { margin: 0; color: #787a73; font-size: 14px; line-height: 1.65; }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(330px, .87fr) minmax(0, 1.13fr);
+      gap: 20px;
+      align-items: stretch;
+    }
+
+    .panel {
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid rgba(65, 67, 55, .08);
+      border-radius: 16px;
+      background: var(--card);
+      box-shadow: var(--shadow);
+    }
+
+    .panel-heading {
+      min-height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 22px;
+      border-bottom: 1px solid var(--line);
+    }
+    .panel-title { font-size: 13px; font-weight: 650; letter-spacing: -.01em; }
+    .step {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: #94958e;
+      font-size: 10px;
+      font-weight: 650;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .step-number {
+      display: grid;
+      place-items: center;
+      width: 20px;
+      height: 20px;
+      border: 1px solid #e8e7df;
+      border-radius: 50%;
+      color: #72766a;
+      font-size: 10px;
+    }
+
+    .input-body { padding: 20px 22px 18px; }
+    .input-hint { margin: 0 0 12px; color: #85867f; font-size: 12px; line-height: 1.6; }
+    textarea {
+      display: block;
+      width: 100%;
+      min-height: 302px;
+      resize: vertical;
+      padding: 15px 15px;
+      border: 1px solid #e8e7df;
+      border-radius: 10px;
+      outline: none;
+      background: #fff;
+      color: #333731;
+      font-size: 13px;
+      line-height: 1.75;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    textarea::placeholder { color: #b1b1aa; }
+    textarea:focus { border-color: #9da58d; box-shadow: 0 0 0 3px rgba(101, 112, 79, .09); }
+    .input-meta { display: flex; justify-content: space-between; gap: 12px; padding-top: 10px; color: #999a93; font-size: 10px; }
+
+    .action-row { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
+    .evaluate {
+      min-height: 45px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      padding: 0 19px;
+      border: 0;
+      border-radius: 9px;
+      background: var(--olive);
+      color: #fff;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 650;
+      transition: background .2s, transform .2s, opacity .2s;
+    }
+    .evaluate:hover:not(:disabled) { transform: translateY(-1px); background: var(--olive-dark); }
+    .evaluate:disabled { cursor: not-allowed; opacity: .48; }
+    .privacy-note { color: #9a9b94; font-size: 10px; }
+    .spinner {
+      display: none;
+      width: 14px;
+      height: 14px;
+      border: 1.5px solid rgba(255,255,255,.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .75s linear infinite;
+    }
+    .is-running .spinner { display: block; }
+    .is-running .sparkle { display: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .chart-panel { display: flex; flex-direction: column; }
+    .chart-heading { min-height: 68px; }
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: #999a93;
+      font-size: 10px;
+    }
+    .live-dot { width: 6px; height: 6px; border-radius: 50%; background: #b4b4ac; }
+    .live-badge.active { color: var(--olive); }
+    .live-badge.active .live-dot { background: #7e9a63; box-shadow: 0 0 0 3px rgba(126,154,99,.13); animation: pulse 1.6s ease infinite; }
+    @keyframes pulse { 50% { box-shadow: 0 0 0 5px rgba(126,154,99,0); } }
+
+    .chart-content { padding: 18px 22px 22px; }
+    .chart-summary { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin: 0 0 4px; }
+    .chart-summary h2 { margin: 0; font-size: 13px; font-weight: 650; letter-spacing: -.015em; }
+    .chart-summary p { margin: 5px 0 0; color: #96978f; font-size: 10px; }
+    .sample-count { color: #73766c; font-size: 10px; white-space: nowrap; }
+    .chart-wrap { position: relative; height: 280px; margin: 8px -2px 0; }
+    canvas { display: block; width: 100%; height: 100%; }
+    .empty-message {
+      position: absolute;
+      inset: 12px 0 28px;
+      display: grid;
+      place-content: center;
+      gap: 7px;
+      text-align: center;
+      pointer-events: none;
+    }
+    .empty-mark { color: #a4a892; }
+    .empty-message strong { color: #73766c; font-size: 11px; font-weight: 600; }
+    .empty-message span { color: #a1a198; font-size: 10px; }
+    .empty-message.hidden { display: none; }
+    .legend { display: flex; flex-wrap: wrap; gap: 17px; padding: 8px 0 18px; }
+    .legend-item { display: inline-flex; align-items: center; gap: 7px; color: #74766f; font-size: 10px; }
+    .legend-dot { width: 7px; height: 7px; border-radius: 50%; }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fbfaf6;
+    }
+    .stat { padding: 12px 14px; }
+    .stat + .stat { border-left: 1px solid var(--line); }
+    .stat-label { color: #96978f; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+    .stat-value { display: block; margin-top: 5px; font-family: Georgia, "Times New Roman", serif; font-size: 21px; line-height: 1; }
+    .progress { display: none; margin-top: 14px; }
+    .progress.visible { display: block; }
+    .progress-top { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 7px; color: #85867f; font-size: 10px; }
+    .progress-track { height: 3px; overflow: hidden; border-radius: 9px; background: #eeede7; }
+    .progress-fill { width: 0; height: 100%; border-radius: inherit; background: var(--olive); transition: width .3s ease; }
+    .status-message { min-height: 15px; margin: 11px 0 0; color: #85867f; font-size: 10px; line-height: 1.5; }
+    .status-message.error { color: #b64f43; }
+
+    footer { display: flex; justify-content: center; padding-top: 24px; color: #a2a39b; font-size: 10px; }
+
+    @media (max-width: 820px) {
+      .shell { padding: 0 28px; }
+      .workspace { grid-template-columns: 1fr; }
+      textarea { min-height: 235px; }
+      .chart-wrap { height: 300px; }
+    }
+    @media (max-width: 520px) {
+      .shell { padding: 0 17px; }
+      header { height: 68px; }
+      .header-note { font-size: 10px; }
+      main { padding-top: 38px; }
+      .intro { margin-bottom: 24px; }
+      .panel-heading { min-height: 60px; padding: 0 17px; }
+      .input-body, .chart-content { padding-right: 17px; padding-left: 17px; }
+      textarea { min-height: 220px; }
+      .chart-wrap { height: 260px; }
+      .legend { gap: 13px; }
+      .privacy-note { max-width: 120px; line-height: 1.4; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg width="17" height="17" viewBox="0 0 20 20" fill="none">
+            <path d="M3 15.5C5.1 15.5 5.2 5 8.25 5s3.2 10 5.8 10c1.25 0 1.95-2.2 2.95-4.3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <span class="brand-name">synthetic reasoning</span>
+      </div>
+      <span class="header-note">A second opinion, from many perspectives.</span>
+    </header>
+
+    <main>
+      <section class="intro">
+        <div class="eyebrow">Writing evaluation, reimagined</div>
+        <h1>See your writing<br>from every angle.</h1>
+        <p>One piece of writing. A whole range of perspectives.<br>See where different AI evaluators land.</p>
+      </section>
+
+      <section class="workspace" aria-label="Writing evaluation workspace">
+        <section class="panel">
+          <div class="panel-heading">
+            <span class="panel-title">Your writing</span>
+            <span class="step"><span class="step-number">1</span> Add your text</span>
+          </div>
+          <div class="input-body">
+            <p class="input-hint">Paste a paragraph, essay, or anything else you'd like a fresh perspective on.</p>
+            <textarea id="writing" maxlength="200000" aria-label="Writing to evaluate" placeholder="Start writing or paste your text here..."></textarea>
+            <div class="input-meta">
+              <span>Up to 200,000 characters</span>
+              <span id="char-count">0 characters</span>
+            </div>
+            <div class="action-row">
+              <button class="evaluate" id="evaluate" type="button" disabled>
+                <span class="spinner" aria-hidden="true"></span>
+                <svg class="sparkle" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M8 1.5 9.6 6.4 14.5 8l-4.9 1.6L8 14.5l-1.6-4.9L1.5 8l4.9-1.6L8 1.5Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+                </svg>
+                <span id="button-label">Evaluate writing</span>
+              </button>
+              <span class="privacy-note">Your text is only sent for evaluation.</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel chart-panel">
+          <div class="panel-heading chart-heading">
+            <span class="panel-title">Score distribution</span>
+            <span class="step"><span class="step-number">2</span> Explore the results</span>
+          </div>
+          <div class="chart-content">
+            <div class="chart-summary">
+              <div>
+                <h2>Scores across evaluators</h2>
+                <p>Each line builds as a new perspective comes in.</p>
+              </div>
+              <div class="live-badge" id="live-badge"><span class="live-dot"></span><span id="live-label">Ready</span></div>
+            </div>
+            <div class="chart-wrap">
+              <canvas id="distribution" role="img" aria-label="Score distribution chart from 1 to 100"></canvas>
+              <div class="empty-message" id="empty-message">
+                <svg class="empty-mark" width="35" height="30" viewBox="0 0 35 30" fill="none" aria-hidden="true">
+                  <path d="M2 25.5h31M4 23c4.2 0 4-14 8.2-14s4.1 14 8.3 14c3 0 3.6-7.5 6.2-7.5 1.7 0 2.8 2.1 4.3 2.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                  <circle cx="12.2" cy="9" r="2" fill="#fffefa" stroke="currentColor" stroke-width="1.3"/>
+                </svg>
+                <strong>Your distribution will take shape here</strong>
+                <span>Evaluate a piece of writing to get started.</span>
+              </div>
+            </div>
+            <div class="legend" aria-label="Evaluator legend">
+              <span class="legend-item"><span class="legend-dot" style="background:#8f9275"></span>Supportive</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#d27b61"></span>Strict</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#727d9b"></span>Neutral</span>
+            </div>
+            <div class="stats">
+              <div class="stat"><span class="stat-label">Perspectives received</span><strong class="stat-value" id="score-count">—</strong></div>
+              <div class="stat"><span class="stat-label">Average score</span><strong class="stat-value" id="average-score">—</strong></div>
+            </div>
+            <div class="progress" id="progress">
+              <div class="progress-top"><span id="progress-label">Preparing evaluation…</span><span id="progress-count">0 / 0</span></div>
+              <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+            </div>
+            <p class="status-message" id="status-message" role="status" aria-live="polite"></p>
+          </div>
+        </section>
+      </section>
+      <footer>Three evaluator styles. Many models. A more nuanced picture.</footer>
+    </main>
+  </div>
+
+  <script>
+    const writing = document.querySelector("#writing");
+    const evaluateButton = document.querySelector("#evaluate");
+    const charCount = document.querySelector("#char-count");
+    const canvas = document.querySelector("#distribution");
+    const context = canvas.getContext("2d");
+    const emptyMessage = document.querySelector("#empty-message");
+    const colors = { supportive: "#8f9275", strict: "#d27b61", neutral: "#727d9b" };
+    const series = Object.fromEntries(Object.keys(colors).map((name) => [name, Array(101).fill(0)]));
+    const displayed = Object.fromEntries(Object.keys(colors).map((name) => [name, Array(101).fill(0)]));
+    let scores = [];
+    let total = 0;
+    let completed = 0;
+    let failed = 0;
+    let running = false;
+    let animationFrame = 0;
+
+    function resizeCanvas() {
+      const bounds = canvas.getBoundingClientRect();
+      const ratio = window.devicePixelRatio || 1;
+      canvas.width = Math.round(bounds.width * ratio);
+      canvas.height = Math.round(bounds.height * ratio);
+      context.setTransform(ratio, 0, 0, ratio, 0, 0);
+      drawChart();
+    }
+
+    function drawChart() {
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      if (!width || !height) return;
+      context.clearRect(0, 0, width, height);
+      const pad = { top: 17, right: 12, bottom: 31, left: 36 };
+      const plotWidth = width - pad.left - pad.right;
+      const plotHeight = height - pad.top - pad.bottom;
+      const peak = Math.max(1, ...Object.values(displayed).flat());
+      const maxValue = peak <= 2 ? 2 : Math.ceil(peak / 2) * 2;
+      context.font = "10px Inter, ui-sans-serif, system-ui, sans-serif";
+      context.textBaseline = "middle";
+      context.lineWidth = 1;
+
+      for (let tick = 0; tick <= 2; tick += 1) {
+        const value = (maxValue / 2) * tick;
+        const y = pad.top + plotHeight - (plotHeight * tick / 2);
+        context.beginPath();
+        context.strokeStyle = "#eeede7";
+        context.moveTo(pad.left, y);
+        context.lineTo(width - pad.right, y);
+        context.stroke();
+        context.fillStyle = "#a0a198";
+        context.textAlign = "right";
+        context.fillText(String(Math.round(value)), pad.left - 8, y);
+      }
+
+      [1, 25, 50, 75, 100].forEach((value) => {
+        const x = pad.left + ((value - 1) / 99) * plotWidth;
+        context.fillStyle = "#a0a198";
+        context.textAlign = value === 1 ? "left" : value === 100 ? "right" : "center";
+        context.fillText(String(value), x, height - 12);
+      });
+
+      Object.entries(colors).forEach(([name, color]) => {
+        const points = displayed[name];
+        if (!points.some((value) => value > .01)) return;
+        const coordinates = [];
+        for (let value = 1; value <= 100; value += 1) {
+          const x = pad.left + ((value - 1) / 99) * plotWidth;
+          const y = pad.top + plotHeight - (points[value] / maxValue) * plotHeight;
+          coordinates.push([x, y]);
+        }
+        context.beginPath();
+        context.moveTo(coordinates[0][0], pad.top + plotHeight);
+        context.lineTo(coordinates[0][0], coordinates[0][1]);
+        for (let index = 1; index < coordinates.length; index += 1) {
+          const midpoint = (coordinates[index - 1][0] + coordinates[index][0]) / 2;
+          context.quadraticCurveTo(coordinates[index - 1][0], coordinates[index - 1][1], midpoint, (coordinates[index - 1][1] + coordinates[index][1]) / 2);
+        }
+        const last = coordinates[coordinates.length - 1];
+        context.lineTo(last[0], last[1]);
+        context.lineTo(last[0], pad.top + plotHeight);
+        context.closePath();
+        context.fillStyle = color + "15";
+        context.fill();
+
+        context.beginPath();
+        context.moveTo(coordinates[0][0], coordinates[0][1]);
+        for (let index = 1; index < coordinates.length; index += 1) {
+          const midpoint = (coordinates[index - 1][0] + coordinates[index][0]) / 2;
+          context.quadraticCurveTo(coordinates[index - 1][0], coordinates[index - 1][1], midpoint, (coordinates[index - 1][1] + coordinates[index][1]) / 2);
+        }
+        context.lineTo(last[0], last[1]);
+        context.strokeStyle = color;
+        context.lineWidth = 2;
+        context.lineJoin = "round";
+        context.lineCap = "round";
+        context.stroke();
+      });
+    }
+
+    function animateChart() {
+      cancelAnimationFrame(animationFrame);
+      const from = Object.fromEntries(Object.keys(colors).map((name) => [name, displayed[name].slice()]));
+      const start = performance.now();
+      const duration = 420;
+      function frame(now) {
+        const progress = Math.min(1, (now - start) / duration);
+        const eased = 1 - (1 - progress) ** 3;
+        Object.keys(colors).forEach((name) => {
+          displayed[name] = series[name].map((value, index) => from[name][index] + (value - from[name][index]) * eased);
+        });
+        drawChart();
+        if (progress < 1) animationFrame = requestAnimationFrame(frame);
+      }
+      animationFrame = requestAnimationFrame(frame);
+    }
+
+    function setRunning(isRunning) {
+      running = isRunning;
+      evaluateButton.classList.toggle("is-running", isRunning);
+      evaluateButton.disabled = isRunning || !writing.value.trim();
+      document.querySelector("#button-label").textContent = isRunning ? "Evaluating…" : "Evaluate writing";
+      document.querySelector("#live-badge").classList.toggle("active", isRunning);
+      document.querySelector("#live-label").textContent = isRunning ? "Evaluating" : "Ready";
+    }
+
+    function updateProgress() {
+      const finished = completed + failed;
+      document.querySelector("#progress-count").textContent = `${finished} / ${total}`;
+      document.querySelector("#progress-fill").style.width = total ? `${(finished / total) * 100}%` : "0%";
+      document.querySelector("#progress-label").textContent = failed
+        ? `${completed} scores received · ${failed} unavailable`
+        : "Scores arriving from the evaluators…";
+    }
+
+    function resetResults() {
+      Object.keys(colors).forEach((name) => {
+        series[name].fill(0);
+        displayed[name].fill(0);
+      });
+      scores = [];
+      completed = 0;
+      failed = 0;
+      total = 0;
+      document.querySelector("#score-count").textContent = "—";
+      document.querySelector("#average-score").textContent = "—";
+      document.querySelector("#progress").classList.remove("visible");
+      document.querySelector("#status-message").textContent = "";
+      document.querySelector("#status-message").classList.remove("error");
+      emptyMessage.classList.remove("hidden");
+      drawChart();
+    }
+
+    async function evaluate() {
+      if (running) return;
+      const text = writing.value.trim();
+      if (!text) {
+        document.querySelector("#status-message").textContent = "Paste some writing before evaluating.";
+        document.querySelector("#status-message").classList.add("error");
+        writing.focus();
+        return;
+      }
+
+      resetResults();
+      setRunning(true);
+      document.querySelector("#progress").classList.add("visible");
+      document.querySelector("#live-label").textContent = "Connecting";
+      document.querySelector("#progress-label").textContent = "Connecting to evaluators…";
+      try {
+        const response = await fetch("/api/evaluate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text })
+        });
+        if (!response.ok) {
+          const result = await response.json();
+          throw new Error(result.error || `Evaluation failed (${response.status}).`);
+        }
+        if (!response.body) throw new Error("This browser does not support streamed results.");
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let finished = false;
+        while (!finished) {
+          const { value, done } = await reader.read();
+          buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+          const lines = buffer.split("\n");
+          buffer = lines.pop();
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            const event = JSON.parse(line);
+            if (event.type === "start") {
+              total = event.total;
+              document.querySelector("#progress-label").textContent = `Evaluating across ${event.models} models…`;
+              updateProgress();
+            } else if (event.type === "score") {
+              series[event.prompt][event.score] += 1;
+              scores.push(event.score);
+              completed += 1;
+              emptyMessage.classList.add("hidden");
+              document.querySelector("#score-count").textContent = String(scores.length);
+              document.querySelector("#average-score").textContent = (scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(1);
+              animateChart();
+              updateProgress();
+            } else if (event.type === "failure") {
+              failed += 1;
+              updateProgress();
+              document.querySelector("#status-message").textContent = `${event.prompt} evaluator unavailable: ${event.message}`;
+            } else if (event.type === "done") {
+              finished = true;
+            }
+          }
+          if (done) finished = true;
+        }
+        if (!scores.length) throw new Error("No scores were returned. Check your API key and try again.");
+        document.querySelector("#progress-label").textContent = failed
+          ? "Evaluation complete · some evaluators were unavailable."
+          : "Evaluation complete.";
+        document.querySelector("#live-label").textContent = "Complete";
+      } catch (error) {
+        const status = document.querySelector("#status-message");
+        status.textContent = error.message || "Something went wrong while evaluating the writing.";
+        status.classList.add("error");
+        document.querySelector("#progress-label").textContent = scores.length
+          ? "Evaluation ended before all scores arrived."
+          : "Evaluation could not be completed.";
+        document.querySelector("#live-label").textContent = "Stopped";
+      } finally {
+        setRunning(false);
+      }
+    }
+
+    writing.addEventListener("input", () => {
+      const count = writing.value.length;
+      charCount.textContent = `${count.toLocaleString()} ${count === 1 ? "character" : "characters"}`;
+      if (!running) evaluateButton.disabled = !writing.value.trim();
+    });
+    evaluateButton.addEventListener("click", evaluate);
+    window.addEventListener("resize", resizeCanvas);
+    new ResizeObserver(resizeCanvas).observe(canvas);
+    resizeCanvas();
+  </script>
+</body>
+</html>

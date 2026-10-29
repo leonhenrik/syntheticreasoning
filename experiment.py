@@ -15,15 +15,17 @@ import matplotlib.pyplot as plt
 
 API = "https://generativelanguage.googleapis.com/v1beta"
 MAX_WORKERS = 2
-API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("gemini_api_key")
-if not API_KEY and Path(".env.local").exists():
-    for line in Path(".env.local").read_text(encoding="utf-8").splitlines():
-        name, separator, value = line.partition("=")
-        if separator and name.strip() in ("GEMINI_API_KEY", "gemini_api_key"):
-            API_KEY = value.strip().strip("\"'")
-            break
-if not API_KEY:
-    raise SystemExit("Set GEMINI_API_KEY or gemini_api_key in your environment or .env.local.")
+def load_api_key():
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("gemini_api_key")
+    if not api_key and Path(".env.local").exists():
+        for line in Path(".env.local").read_text(encoding="utf-8").splitlines():
+            name, separator, value = line.partition("=")
+            if separator and name.strip() in ("GEMINI_API_KEY", "gemini_api_key"):
+                api_key = value.strip().strip("\"'")
+                break
+    if not api_key:
+        raise RuntimeError("Set GEMINI_API_KEY or gemini_api_key in your environment or .env.local.")
+    return api_key
 
 
 def api_request(url, data=None):
@@ -48,11 +50,11 @@ def api_request(url, data=None):
             raise RuntimeError(f"Gemini API HTTP {error.code}: {detail}") from error
 
 
-def get_models():
+def get_models(api_key):
     models = []
     page_token = ""
     while True:
-        query = urllib.parse.urlencode({"key": API_KEY, "pageSize": 1000, "pageToken": page_token})
+        query = urllib.parse.urlencode({"key": api_key, "pageSize": 1000, "pageToken": page_token})
         page = api_request(f"{API}/models?{query}")
         models.extend(
             model_name
@@ -67,13 +69,13 @@ def get_models():
             return models
 
 
-def score(model, instruction, writing):
+def score(model, instruction, writing, api_key):
     prompt = (
         f"{instruction}\nGive the writing a score from 1 to 100. "
         "Return only an integer.\n\nWriting:\n"
         f"{writing}"
     )
-    query = urllib.parse.urlencode({"key": API_KEY})
+    query = urllib.parse.urlencode({"key": api_key})
     result = api_request(
         f"{API}/{model}:generateContent?{query}",
         {
@@ -101,53 +103,63 @@ def plot_scores(name, scores, output):
     plt.close()
 
 
-try:
-    with open("prompts.json", encoding="utf-8") as file:
-        config = json.load(file)
-except json.JSONDecodeError as error:
-    raise SystemExit(
-        f"prompts.json is invalid at line {error.lineno}, column {error.colno}. "
-        "For multi-line writing, escape line breaks as \\n inside the JSON string."
-    ) from error
+def main():
+    try:
+        with open("prompts.json", encoding="utf-8") as file:
+            config = json.load(file)
+    except json.JSONDecodeError as error:
+        raise SystemExit(
+            f"prompts.json is invalid at line {error.lineno}, column {error.colno}. "
+            "For multi-line writing, escape line breaks as \\n inside the JSON string."
+        ) from error
 
-writing = config["text_to_evaluate"]
-prompts = config["evaluation_prompts"]
-models = get_models()
-if not models:
-    raise SystemExit("Gemini returned no models that support generateContent.")
+    try:
+        api_key = load_api_key()
+    except RuntimeError as error:
+        raise SystemExit(str(error)) from error
 
-output = Path("results") / datetime.now().strftime("%Y%m%dT%H%M%S")
-output.mkdir(parents=True)
-scores_by_prompt = {prompt["name"]: [] for prompt in prompts}
-all_scores = []
+    writing = config["text_to_evaluate"]
+    prompts = config["evaluation_prompts"]
+    models = get_models(api_key)
+    if not models:
+        raise SystemExit("Gemini returned no models that support generateContent.")
 
-with (output / "scores.csv").open("w", newline="", encoding="utf-8") as file:
-    rows = csv.writer(file)
-    rows.writerow(["model", "prompt", "score"])
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
-        requests = {
-            pool.submit(score, model, prompt["instruction"], writing): (model, prompt["name"])
-            for model in models
-            for prompt in prompts
-        }
-        for request in as_completed(requests):
-            model, prompt_name = requests[request]
-            try:
-                value = request.result()
-                rows.writerow([model, prompt_name, value])
-                file.flush()
-                scores_by_prompt[prompt_name].append(value)
-                all_scores.append(value)
-                print(f"{model} | {prompt_name}: {value}")
-            except (urllib.error.URLError, OSError, KeyError, IndexError, ValueError, RuntimeError) as error:
-                print(f"{model} | {prompt_name}: FAILED - {str(error).replace(API_KEY, '[redacted]')}")
+    output = Path("results") / datetime.now().strftime("%Y%m%dT%H%M%S")
+    output.mkdir(parents=True)
+    scores_by_prompt = {prompt["name"]: [] for prompt in prompts}
+    all_scores = []
 
-if not all_scores:
-    raise SystemExit(f"No scores received. Check {output / 'scores.csv'}.")
+    with (output / "scores.csv").open("w", newline="", encoding="utf-8") as file:
+        rows = csv.writer(file)
+        rows.writerow(["model", "prompt", "score"])
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
+            requests = {
+                pool.submit(score, model, prompt["instruction"], writing, api_key): (model, prompt["name"])
+                for model in models
+                for prompt in prompts
+            }
+            for request in as_completed(requests):
+                model, prompt_name = requests[request]
+                try:
+                    value = request.result()
+                    rows.writerow([model, prompt_name, value])
+                    file.flush()
+                    scores_by_prompt[prompt_name].append(value)
+                    all_scores.append(value)
+                    print(f"{model} | {prompt_name}: {value}")
+                except (urllib.error.URLError, OSError, KeyError, IndexError, ValueError, RuntimeError) as error:
+                    print(f"{model} | {prompt_name}: FAILED - {str(error).replace(api_key, '[redacted]')}")
 
-plot_scores("total", all_scores, output)
-for name, scores in scores_by_prompt.items():
-    if scores:
-        plot_scores(name, scores, output)
+    if not all_scores:
+        raise SystemExit(f"No scores received. Check {output / 'scores.csv'}.")
 
-print(f"Results saved in {output}")
+    plot_scores("total", all_scores, output)
+    for name, scores in scores_by_prompt.items():
+        if scores:
+            plot_scores(name, scores, output)
+
+    print(f"Results saved in {output}")
+
+
+if __name__ == "__main__":
+    main()
