@@ -53,7 +53,7 @@ class AppHandler(BaseHTTPRequestHandler):
                 prompts = json.load(file)["evaluation_prompts"]
             models = get_models(api_key)
             if not models:
-                self.send_json_error(502, "Gemini returned no models that support writing evaluation.")
+                self.send_json_error(502, "NVIDIA returned no available chat-completion models.")
                 return
         except (json.JSONDecodeError, AttributeError, TypeError):
             self.send_json_error(400, "Request body must contain a text string.")
@@ -90,7 +90,7 @@ class AppHandler(BaseHTTPRequestHandler):
                     self.write_event(
                         {
                             "type": "score",
-                            "model": model[7:] if model.startswith("models/") else model,
+                            "model": model,
                             "prompt": prompt_name,
                             "score": value,
                             "completed": completed,
@@ -102,7 +102,7 @@ class AppHandler(BaseHTTPRequestHandler):
                     self.write_event(
                         {
                             "type": "failure",
-                            "model": model[7:] if model.startswith("models/") else model,
+                            "model": model,
                             "prompt": prompt_name,
                             "message": message,
                             "completed": completed,

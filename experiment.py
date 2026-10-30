@@ -4,7 +4,6 @@ import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import urllib.error
-import urllib.parse
 import urllib.request
 from collections import Counter
 from datetime import datetime
@@ -13,30 +12,37 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 
-API = "https://generativelanguage.googleapis.com/v1beta"
+API = "https://integrate.api.nvidia.com/v1"
 MAX_WORKERS = 2
+REQUEST_TIMEOUT = 180
+DEFAULT_MODELS = ("mistralai/mistral-large-4-1t-a52b",)
+
+
 def load_api_key():
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("gemini_api_key")
+    api_key = os.getenv("NVIDIA_API_KEY") or os.getenv("nvidia_api_key")
     if not api_key and Path(".env.local").exists():
         for line in Path(".env.local").read_text(encoding="utf-8").splitlines():
             name, separator, value = line.partition("=")
-            if separator and name.strip() in ("GEMINI_API_KEY", "gemini_api_key"):
+            if separator and name.strip() in ("NVIDIA_API_KEY", "nvidia_api_key"):
                 api_key = value.strip().strip("\"'")
                 break
     if not api_key:
-        raise RuntimeError("Set GEMINI_API_KEY or gemini_api_key in your environment or .env.local.")
+        raise RuntimeError("Set NVIDIA_API_KEY or nvidia_api_key in your environment or .env.local.")
     return api_key
 
 
-def api_request(url, data=None):
+def api_request(url, api_key, data=None):
     request = urllib.request.Request(
         url,
         data=json.dumps(data).encode() if data is not None else None,
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
     )
     for attempt in range(3):
         try:
-            with urllib.request.urlopen(request, timeout=90) as response:
+            with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT) as response:
                 return json.load(response)
         except urllib.error.HTTPError as error:
             detail = error.read().decode("utf-8", errors="replace")
@@ -47,26 +53,35 @@ def api_request(url, data=None):
                     delay = 2**attempt
                 time.sleep(min(delay, 30))
                 continue
-            raise RuntimeError(f"Gemini API HTTP {error.code}: {detail}") from error
+            raise RuntimeError(f"NVIDIA API HTTP {error.code}: {detail}") from error
 
 
 def get_models(api_key):
-    models = []
-    page_token = ""
-    while True:
-        query = urllib.parse.urlencode({"key": api_key, "pageSize": 1000, "pageToken": page_token})
-        page = api_request(f"{API}/models?{query}")
-        models.extend(
-            model_name
-            for model in page.get("models", [])
-            if "generateContent" in model.get("supportedGenerationMethods", [])
-            and (model_name := model.get("name", "")).startswith("models/")
-            and "2.5" not in model_name
-            and not any(term in model_name.lower() for term in ("image", "tts", "banana"))
+    result = api_request(f"{API}/models", api_key)
+    catalog = {
+        model_id
+        for model in result.get("data", [])
+        if isinstance(model, dict)
+        and isinstance((model_id := model.get("id")), str)
+        and model_id
+    }
+    configured_models = os.getenv("NVIDIA_MODELS")
+    if configured_models is None:
+        requested_models = list(DEFAULT_MODELS)
+    else:
+        requested_models = list(dict.fromkeys(
+            model.strip() for model in configured_models.split(",") if model.strip()
+        ))
+        if not requested_models:
+            raise RuntimeError("NVIDIA_MODELS must contain one or more comma-separated model IDs.")
+
+    unavailable_models = [model for model in requested_models if model not in catalog]
+    if unavailable_models:
+        raise RuntimeError(
+            "These NVIDIA_MODELS IDs were not returned by NVIDIA's model catalog: "
+            + ", ".join(unavailable_models)
         )
-        page_token = page.get("nextPageToken", "")
-        if not page_token:
-            return models
+    return requested_models
 
 
 def score(model, instruction, writing, api_key):
@@ -75,19 +90,29 @@ def score(model, instruction, writing, api_key):
         "Return only an integer.\n\nWriting:\n"
         f"{writing}"
     )
-    query = urllib.parse.urlencode({"key": api_key})
     result = api_request(
-        f"{API}/{model}:generateContent?{query}",
+        f"{API}/chat/completions",
+        api_key,
         {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"responseMimeType": "application/json"},
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 4096,
+            "temperature": 0,
+            "stream": False,
+            "reasoning_effort": "high",
         },
     )
-    value = json.loads(result["candidates"][0]["content"]["parts"][0]["text"])
-    if isinstance(value, dict):
-        value = value.get("score")
-    if type(value) is not int or not 1 <= value <= 100:
-        raise ValueError(f"Expected an integer from 1 to 100; received {value!r}")
+    choice = result["choices"][0]
+    response_text = choice["message"]["content"]
+    if not isinstance(response_text, str):
+        raise ValueError(
+            "NVIDIA returned no text score "
+            f"(finish reason: {choice.get('finish_reason')!r})."
+        )
+    response_text = response_text.strip()
+    value = int(response_text)
+    if not 1 <= value <= 100:
+        raise ValueError(f"Expected an integer from 1 to 100; received {value}")
     return value
 
 
@@ -122,7 +147,7 @@ def main():
     prompts = config["evaluation_prompts"]
     models = get_models(api_key)
     if not models:
-        raise SystemExit("Gemini returned no models that support generateContent.")
+        raise SystemExit("NVIDIA returned no available chat-completion models.")
 
     output = Path("results") / datetime.now().strftime("%Y%m%dT%H%M%S")
     output.mkdir(parents=True)
